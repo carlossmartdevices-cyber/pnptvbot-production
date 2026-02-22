@@ -1,524 +1,588 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>PNPtv - Premium Entertainment Platform | PRIME Hub</title>
-    <meta name="description" content="Join PNPtv PRIME Hub - Exclusive premium entertainment with HD/4K content, live video rooms, and verified community. Stream. Connect. Discover.">
-    <meta name="keywords" content="PNPtv, PRIME Hub, premium entertainment, video streaming, live rooms, community">
-    <meta name="theme-color" content="#0d0f14">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="theme-color" content="#120d14" />
+  <meta name="description" content="PRIME Hub - PNPtv Community Platform" />
+  <title>PRIME Hub - PNPtv</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    <!-- Preconnect to font services -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    :root {
+      --bg: #120d14;
+      --surface: #2C2C2E;
+      --border: rgba(255,255,255,0.08);
+      --text: #FFFFFF;
+      --muted: #8E8E93;
+      --accent: #ff3377;
+      --amber: #ff9933;
+      --radius: 16px;
+    }
 
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/Logo2.png">
+    .glow {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,0,204,0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    }
 
-        :root {
-            --bg-primary: #0d0f14;
-            --bg-secondary: #1a1d24;
-            --bg-tertiary: #22262f;
-            --brand-pink: #ff3a7d;
-            --brand-pink-light: rgba(255, 58, 125, 0.15);
-            --brand-amber: #ff9c38;
-            --brand-teal: #2ce2c9;
-            --text-primary: #f0f2f8;
-            --text-secondary: #9ba3b8;
-            --text-muted: #5c6478;
-            --border-color: rgba(255, 255, 255, 0.07);
-            --border-active: rgba(255, 58, 125, 0.4);
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-display: 'Outfit', var(--font-sans);
-            --radius-lg: 16px;
-            --radius-xl: 20px;
-            --shadow-brand: 0 8px 32px rgba(255, 58, 125, 0.25);
-        }
+    .logo img {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 4px;
+    }
 
-        html {
-            scroll-behavior: smooth;
-        }
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
 
-        body {
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-family: var(--font-sans);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
+    /* Error / success banners */
+    .banner {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .banner.error  { background: rgba(255,69,58,0.15);  border: 1px solid rgba(255,69,58,0.4);  color: #ff453a; }
+    .banner.success { background: rgba(48,209,88,0.12); border: 1px solid rgba(48,209,88,0.35); color: #30d158; }
+    .banner.show { display: block; }
 
-        /* Header */
-        header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            background: rgba(13, 15, 20, 0.8);
-            border-bottom: 1px solid var(--border-color);
-            padding: 16px 32px;
-        }
 
-        .header-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      margin: 14px 0;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-            color: var(--text-primary);
-            font-family: var(--font-display);
-            font-size: 20px;
-            font-weight: 800;
-        }
+    /* Buttons */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 13px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .logo img {
-            height: 40px;
-            width: auto;
-        }
+    .btn-telegram {
+      background: #2AABEE;
+      color: #fff;
+      margin-bottom: 14px;
+    }
+    .btn-telegram:hover { background: #229ED9; }
 
-        .logo span {
-            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+    .btn-x {
+      background: #000;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.15);
+      margin-bottom: 14px;
+    }
+    .btn-x:hover { background: #111; }
 
-        nav {
-            display: flex;
-            gap: 24px;
-            align-items: center;
-        }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8A00FF);
+      color: #fff;
+      margin-top: 4px;
+    }
+    .btn-primary:hover { opacity: 0.9; }
 
-        nav a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: -2px;
+      user-select: none;
+    }
+    .remember-row input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+    }
 
-        nav a:hover {
-            color: var(--brand-pink);
-        }
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: rgba(0,0,0,0.25);
+      border-radius: 10px;
+      padding: 3px;
+      margin-bottom: 18px;
+    }
+    .tab {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.15s;
+    }
+    .tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
 
-        .cta-button {
-            padding: 10px 24px;
-            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
-            border: none;
-            border-radius: var(--radius-xl);
-            color: white;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: var(--shadow-brand);
-            text-decoration: none;
-            display: inline-block;
-        }
+    /* Form */
+    .form { display: flex; flex-direction: column; gap: 10px; }
+    .form.hidden { display: none; }
 
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 40px rgba(255, 58, 125, 0.35);
-        }
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: rgba(255,0,204,0.5); }
+    input::placeholder { color: var(--muted); }
 
-        /* Hero */
-        .hero {
-            margin-top: 80px;
-            min-height: calc(100vh - 80px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 48px 32px;
-            background: linear-gradient(135deg, rgba(255, 58, 125, 0.05) 0%, rgba(44, 226, 201, 0.05) 100%);
-            position: relative;
-            overflow: hidden;
-        }
+    /* Footer */
+    .footer {
+      margin-top: 22px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .footer a { color: var(--amber); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
 
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 1000px;
-            height: 1000px;
-            background: radial-gradient(circle, rgba(255, 58, 125, 0.1) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .hero::after {
-            content: '';
-            position: absolute;
-            bottom: -50%;
-            left: -50%;
-            width: 1000px;
-            height: 1000px;
-            background: radial-gradient(circle, rgba(44, 226, 201, 0.08) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .hero-content {
-            max-width: 700px;
-            text-align: center;
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero h1 {
-            font-family: var(--font-display);
-            font-size: clamp(32px, 5vw, 56px);
-            font-weight: 800;
-            margin-bottom: 16px;
-            line-height: 1.2;
-        }
-
-        .hero h1 .gradient {
-            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero p {
-            font-size: 18px;
-            color: var(--text-secondary);
-            margin-bottom: 32px;
-            line-height: 1.8;
-        }
-
-        .hero-cta {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .button-primary {
-            padding: 14px 32px;
-            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
-            border: none;
-            border-radius: var(--radius-xl);
-            color: white;
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: var(--shadow-brand);
-            text-decoration: none;
-            display: inline-block;
-            font-family: var(--font-sans);
-        }
-
-        .button-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 50px rgba(255, 58, 125, 0.4);
-        }
-
-        .button-secondary {
-            padding: 14px 32px;
-            background: transparent;
-            border: 2px solid var(--brand-teal);
-            border-radius: var(--radius-xl);
-            color: var(--brand-teal);
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-            font-family: var(--font-sans);
-        }
-
-        .button-secondary:hover {
-            background: rgba(44, 226, 201, 0.1);
-            transform: translateY(-3px);
-        }
-
-        /* Features */
-        .features {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 48px 32px;
-        }
-
-        .section-title {
-            font-family: var(--font-display);
-            font-size: 36px;
-            font-weight: 800;
-            text-align: center;
-            margin-bottom: 48px;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 32px;
-        }
-
-        .feature-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: 32px;
-            transition: all 0.3s ease;
-        }
-
-        .feature-card:hover {
-            border-color: var(--brand-pink);
-            background: linear-gradient(135deg, rgba(255, 58, 125, 0.05) 0%, rgba(44, 226, 201, 0.02) 100%);
-            transform: translateY(-5px);
-        }
-
-        .feature-icon {
-            font-size: 32px;
-            margin-bottom: 16px;
-        }
-
-        .feature-card h3 {
-            font-family: var(--font-display);
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-
-        .feature-card p {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
-        /* Stats */
-        .stats {
-            background: var(--bg-secondary);
-            padding: 48px 32px;
-            margin: 48px 0;
-        }
-
-        .stats-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 32px;
-            text-align: center;
-        }
-
-        .stat-item h4 {
-            font-size: 32px;
-            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-teal) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
-            font-family: var(--font-display);
-        }
-
-        .stat-item p {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
-        /* Footer CTA */
-        .footer-cta {
-            max-width: 1200px;
-            margin: 48px auto;
-            padding: 48px 32px;
-            text-align: center;
-            background: linear-gradient(135deg, rgba(255, 58, 125, 0.1) 0%, rgba(44, 226, 201, 0.05) 100%);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-        }
-
-        .footer-cta h2 {
-            font-family: var(--font-display);
-            font-size: 32px;
-            font-weight: 800;
-            margin-bottom: 16px;
-        }
-
-        .footer-cta p {
-            color: var(--text-secondary);
-            margin-bottom: 32px;
-            font-size: 16px;
-        }
-
-        /* Footer */
-        footer {
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border-color);
-            padding: 32px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 14px;
-        }
-
-        footer a {
-            color: var(--brand-pink);
-            text-decoration: none;
-        }
-
-        footer a:hover {
-            color: var(--brand-amber);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            header {
-                padding: 12px 16px;
-            }
-
-            .header-container {
-                flex-direction: column;
-                gap: 16px;
-            }
-
-            nav {
-                flex-direction: column;
-                gap: 12px;
-                width: 100%;
-                text-align: center;
-            }
-
-            .hero {
-                margin-top: 120px;
-                padding: 32px 16px;
-            }
-
-            .hero-cta {
-                flex-direction: column;
-            }
-
-            .button-primary,
-            .button-secondary {
-                width: 100%;
-            }
-
-            .features-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    /* X icon SVG */
+    .x-icon { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+  </style>
 </head>
 <body>
-    <header>
-        <div class="header-container">
-            <a href="/" class="logo">
-                <img src="/Logo2.png" alt="PNPtv Logo">
-                <span>PRIME</span>
-            </a>
-            <nav>
-                <a href="#features">Features</a>
-                <a href="#community">Community</a>
-                <a href="/auth/" class="cta-button">Login</a>
-            </nav>
-        </div>
-    </header>
+  <div class="glow"></div>
 
-    <section class="hero" id="home">
-        <div class="hero-content">
-            <h1>Welcome to <span class="gradient">PRIME Hub</span></h1>
-            <p>Experience premium entertainment like never before. Stream HD/4K content, connect with our verified community, and discover exclusive features available only to PRIME members.</p>
-            <div class="hero-cta">
-                <a href="/auth/" class="button-primary">🔒 Sign In with Telegram</a>
-                <a href="#features" class="button-secondary">Learn More</a>
-            </div>
-        </div>
-    </section>
+  <div class="card">
+    <div class="logo"><img src="/Logo2-50.png" alt="PNPtv PRIME" /></div>
+    <p class="subtitle">Inicia sesión para acceder a la comunidad</p>
 
-    <section class="features" id="features">
-        <h2 class="section-title">Exclusive Features</h2>
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="feature-icon">🎬</div>
-                <h3>Premium Content</h3>
-                <p>Access HD/4K videos with exclusive content only available to PRIME members.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🎥</div>
-                <h3>Live Streaming</h3>
-                <p>Connect with creators and community in real-time video rooms.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🎵</div>
-                <h3>24/7 Radio</h3>
-                <p>Enjoy curated streams and audio content around the clock.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">👥</div>
-                <h3>Community</h3>
-                <p>Join verified community hangouts and engage with like-minded members.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔐</div>
-                <h3>Verified Members</h3>
-                <p>Safe and secure environment with verified user authentication.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">⚡</div>
-                <h3>Lightning Fast</h3>
-                <p>Experience seamless streaming with optimized performance.</p>
-            </div>
-        </div>
-    </section>
+    <div id="error-banner"  class="banner error"></div>
+    <div id="success-banner" class="banner success"></div>
 
-    <section class="stats">
-        <div class="stats-container">
-            <div class="stat-item">
-                <h4>50K+</h4>
-                <p>Active Members</p>
-            </div>
-            <div class="stat-item">
-                <h4>10K+</h4>
-                <p>Premium Videos</p>
-            </div>
-            <div class="stat-item">
-                <h4>24/7</h4>
-                <p>Live Streaming</p>
-            </div>
-            <div class="stat-item">
-                <h4>99.9%</h4>
-                <p>Uptime</p>
-            </div>
-        </div>
-    </section>
+    <!-- 1. Telegram Login (deep-link + poll, no widget dependency) -->
+    <button type="button" class="btn btn-telegram" id="btn-telegram-main" onclick="handleTelegramLogin()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
+        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+      </svg>
+      Continuar con Telegram
+    </button>
+    <button type="button" class="btn btn-telegram" id="btn-telegram-fallback" style="display:none;" onclick="handleTelegramLogin()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
+        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+      </svg>
+      Continuar con Telegram
+    </button>
+    <div style="text-align:center;margin-top:6px;">
+      <a href="#" onclick="handleTelegramOAuthLogin();return false;" style="font-size:12px;color:var(--amber);text-decoration:none;">Usar OAuth directo de Telegram</a>
+    </div>
 
-    <section class="footer-cta" id="community">
-        <h2>Ready to Join?</h2>
-        <p>Get instant access to premium content with our secure Telegram authentication</p>
-        <a href="/auth/" class="button-primary">Start Free Trial</a>
-    </section>
+    <div class="divider">o</div>
 
-    <footer>
-        <p>&copy; 2026 PNPtv PRIME Hub. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a></p>
-    </footer>
+    <!-- 2. X (Twitter) OAuth - TEMPORARILY HIDDEN FOR MAINTENANCE -->
+    <button type="button" class="btn btn-x" id="btn-x" onclick="handleXLogin()" style="display:none;">
+      <svg class="x-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.745l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      Continuar con X
+    </button>
 
-    <script>
-        fetch('/api/auth/status', { credentials: 'include' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.data?.authenticated) {
-                    window.location.href = '/hub/';
-                }
-            })
-            .catch(() => {});
-    </script>
+    <div class="divider" style="display:none;">o</div>
+
+    <!-- 3. Email / Password -->
+    <div class="tabs">
+      <button type="button" class="tab active" id="tab-login"    onclick="switchTab('login')">Iniciar sesión</button>
+      <button type="button" class="tab"        id="tab-register" onclick="switchTab('register')">Registrarse</button>
+    </div>
+
+    <!-- Login form -->
+    <form class="form" id="form-login" onsubmit="return handleLogin(event);">
+      <input type="email"    id="login-email" name="email" placeholder="Correo electrónico" autocomplete="username" />
+      <input type="password" id="login-password" name="password" placeholder="Contraseña" autocomplete="current-password" />
+      <label class="remember-row" for="login-remember">
+        <input type="checkbox" id="login-remember" name="rememberMe" />
+        Recordarme en este dispositivo (30 días)
+      </label>
+      <button type="submit" class="btn btn-primary" id="btn-login">Iniciar sesión</button>
+      <div style="text-align:center;margin-top:4px;">
+        <a href="#" onclick="showForgot();return false;" style="font-size:12px;color:var(--amber);text-decoration:none;">¿Olvidaste tu contraseña?</a>
+      </div>
+    </form>
+
+    <!-- Forgot password form (hidden by default) -->
+    <form class="form hidden" id="form-forgot" onsubmit="return handleForgot(event);">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:4px;">Ingresa tu correo y te enviamos un enlace para restablecer tu contraseña.</p>
+      <input type="email" id="forgot-email" name="email" placeholder="Correo electrónico" autocomplete="email" />
+      <button type="submit" class="btn btn-primary" id="btn-forgot">Enviar enlace</button>
+      <div style="text-align:center;margin-top:4px;">
+        <a href="#" onclick="hideForgot();return false;" style="font-size:12px;color:var(--amber);text-decoration:none;">← Volver</a>
+      </div>
+    </form>
+
+    <!-- Register form -->
+    <form class="form hidden" id="form-register" onsubmit="return handleRegister(event);">
+      <input type="text"     id="reg-name" name="firstName" placeholder="Nombre" autocomplete="given-name" />
+      <input type="email"    id="reg-email" name="email" placeholder="Correo electrónico" autocomplete="email" />
+      <input type="password" id="reg-password" name="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password" />
+      <button type="submit" class="btn btn-primary" id="btn-register">Crear cuenta</button>
+    </form>
+
+    <p class="footer">
+      Al ingresar aceptas nuestros
+      <a href="/terms" target="_blank">Términos y Condiciones</a>
+      y nuestra
+      <a href="/privacy" target="_blank">Política de Privacidad</a>.<br/>
+      Debes ser mayor de 18 años para usar esta plataforma.
+    </p>
+  </div>
+
+  <script>
+    const CANONICAL_ORIGIN = 'https://pnptv.app';
+    const CANONICAL_APP_URL = `${CANONICAL_ORIGIN}/app`;
+
+    // Always keep authentication on canonical domain.
+    if (window.location.origin !== CANONICAL_ORIGIN) {
+      window.location.replace(`${CANONICAL_ORIGIN}${window.location.pathname}${window.location.search}${window.location.hash}`);
+    }
+
+    // ── Show error/success from URL params ─────────────────────────────────────
+    (function () {
+      const p = new URLSearchParams(location.search);
+      const err = p.get('error');
+      const msgs = {
+        auth_failed:     'La autenticación falló. Por favor intenta de nuevo.',
+        not_registered:  p.get('x_handle')
+          ? `La cuenta @${p.get('x_handle')} no está registrada en PNPtv. Regístrate primero con el bot de Telegram.`
+          : 'Esta cuenta no está registrada. Usa el bot de Telegram primero.',
+        missing_params:  'La autenticación fue incompleta. Por favor intenta de nuevo.',
+      };
+      if (err && msgs[err]) showBanner('error', msgs[err]);
+    })();
+
+    const REMEMBER_ME_KEY = 'pnptv.rememberMe';
+    const REMEMBER_EMAIL_KEY = 'pnptv.rememberedEmail';
+
+    (function restoreRememberedLogin() {
+      try {
+        const rememberMe = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+        const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY) || '';
+        const rememberEl = document.getElementById('login-remember');
+        const emailEl = document.getElementById('login-email');
+        if (!rememberEl || !emailEl) return;
+
+        rememberEl.checked = rememberMe;
+        if (rememberMe && savedEmail) emailEl.value = savedEmail;
+      } catch (_) {
+        // Ignore browser storage issues.
+      }
+    })();
+
+    // ── Tab switch ─────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+      document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('form-forgot').classList.add('hidden');
+      document.getElementById('form-register').classList.toggle('hidden', tab !== 'register');
+      clearBanners();
+    }
+
+    // ── Forgot password ────────────────────────────────────────────────────────
+    function showForgot() {
+      document.getElementById('form-login').classList.add('hidden');
+      document.getElementById('form-forgot').classList.remove('hidden');
+      clearBanners();
+    }
+    function hideForgot() {
+      document.getElementById('form-forgot').classList.add('hidden');
+      document.getElementById('form-login').classList.remove('hidden');
+      clearBanners();
+    }
+    async function handleForgot(event) {
+      if (event) event.preventDefault();
+      clearBanners();
+      const email = document.getElementById('forgot-email').value.trim();
+      const btn   = document.getElementById('btn-forgot');
+      if (!email) { showBanner('error', 'Ingresa tu correo electrónico.'); return; }
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      try {
+        await fetch('/api/webapp/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email }),
+        });
+        showBanner('success', 'Si ese correo está registrado, recibirás un enlace en breve.');
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar enlace';
+      }
+      return false;
+    }
+
+    // ── Banners ────────────────────────────────────────────────────────────────
+    function showBanner(type, msg) {
+      const el = document.getElementById(`${type}-banner`);
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+    function clearBanners() {
+      document.getElementById('error-banner').classList.remove('show');
+      document.getElementById('success-banner').classList.remove('show');
+    }
+
+    // ── Email Login ────────────────────────────────────────────────────────────
+    async function handleLogin(event) {
+      if (event) event.preventDefault();
+      clearBanners();
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const rememberMe = document.getElementById('login-remember').checked;
+      const btn      = document.getElementById('btn-login');
+
+      if (!email || !password) { showBanner('error', 'Completa todos los campos.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Ingresando...';
+      try {
+        const res  = await fetch('/api/webapp/auth/email/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password, rememberMe }),
+        });
+        const data = await res.json();
+        if (res.ok && data.authenticated) {
+          try {
+            if (rememberMe) {
+              localStorage.setItem(REMEMBER_ME_KEY, '1');
+              localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+            } else {
+              localStorage.removeItem(REMEMBER_ME_KEY);
+              localStorage.removeItem(REMEMBER_EMAIL_KEY);
+            }
+          } catch (_) {
+            // Ignore browser storage issues.
+          }
+          showBanner('success', '¡Bienvenido! Redirigiendo...');
+          setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800);
+        } else if (data.error === 'email_not_verified') {
+          // Email not verified — show resend option
+          const resendLink = document.createElement('a');
+          resendLink.href = '#';
+          resendLink.style.color = 'var(--amber)';
+          resendLink.style.textDecoration = 'underline';
+          resendLink.style.marginLeft = '4px';
+          resendLink.onclick = (e) => { e.preventDefault(); handleResendVerification(email, btn); };
+          resendLink.textContent = 'Reenviar correo';
+
+          const errorEl = document.getElementById('error-banner');
+          errorEl.textContent = 'Por favor verifica tu email antes de iniciar sesión. ';
+          errorEl.appendChild(resendLink);
+          errorEl.classList.add('show');
+          btn.disabled = false;
+          btn.textContent = 'Iniciar sesión';
+        } else {
+          showBanner('error', data.error || 'Error al iniciar sesión.');
+          btn.disabled = false;
+          btn.textContent = 'Iniciar sesión';
+        }
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Iniciar sesión';
+      }
+      return false;
+    }
+
+    // ── Email Register ─────────────────────────────────────────────────────────
+    async function handleRegister(event) {
+      if (event) event.preventDefault();
+      clearBanners();
+      const firstName = document.getElementById('reg-name').value.trim();
+      const email     = document.getElementById('reg-email').value.trim();
+      const password  = document.getElementById('reg-password').value;
+      const btn       = document.getElementById('btn-register');
+
+      if (!firstName || !email || !password) { showBanner('error', 'Completa todos los campos.'); return; }
+      if (password.length < 8) { showBanner('error', 'La contraseña debe tener al menos 8 caracteres.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Creando cuenta...';
+      try {
+        const res  = await fetch('/api/webapp/auth/email/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ firstName, email, password }),
+        });
+        const data = await res.json();
+        if (data.requiresVerification) {
+          showBanner('success', '¡Cuenta creada! Revisa tu correo para verificar tu email.');
+          // Clear form
+          document.getElementById('reg-name').value = '';
+          document.getElementById('reg-email').value = '';
+          document.getElementById('reg-password').value = '';
+          btn.disabled = false;
+          btn.textContent = 'Crear cuenta';
+        } else if (res.ok && data.authenticated) {
+          showBanner('success', '¡Cuenta creada! Redirigiendo...');
+          setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800);
+        } else {
+          showBanner('error', data.error || 'Error al registrarse.');
+          btn.disabled = false;
+          btn.textContent = 'Crear cuenta';
+        }
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Crear cuenta';
+      }
+      return false;
+    }
+
+    // ── Resend Verification Email ──────────────────────────────────────────────
+    async function handleResendVerification(email, triggerBtn) {
+      clearBanners();
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = 'Reenviando...';
+      try {
+        const res = await fetch('/api/webapp/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showBanner('success', 'Se envió un nuevo correo de verificación. Revisa tu bandeja de entrada.');
+        } else {
+          showBanner('error', data.error || 'Error al reenviar correo.');
+        }
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+      } finally {
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = 'Iniciar sesión';
+      }
+    }
+
+    // ── Telegram Login ─────────────────────────────────────────────────────
+    function handleTelegramOAuthLogin() {
+      clearBanners();
+      window.location.href = '/api/webapp/auth/telegram/start';
+    }
+
+    // Deep link login (primary flow)
+    let _tgPollInterval = null;
+    const svgTelegram = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>';
+
+    async function handleTelegramLogin() {
+      clearBanners();
+      const btn = document.getElementById('btn-telegram-main');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-sm"></span> Conectando...';
+      try {
+        const res = await fetch('/api/webapp/auth/telegram/token', { method: 'POST', credentials: 'include' });
+        const data = await res.json();
+        if (!res.ok || !data.token) { showBanner('error', 'Error al generar enlace.'); btn.disabled = false; btn.innerHTML = svgTelegram + ' Continuar con Telegram'; return; }
+        window.open(data.deepLink, '_blank');
+        btn.innerHTML = '<span class="spinner-sm"></span> Esperando...';
+        showBanner('success', 'Abre Telegram y presiona START para completar el login.');
+        let attempts = 0;
+        _tgPollInterval = setInterval(async () => {
+          if (++attempts > 60) { clearInterval(_tgPollInterval); showBanner('error', 'Tiempo agotado.'); btn.disabled = false; btn.innerHTML = svgTelegram + ' Continuar con Telegram'; return; }
+          try {
+            const c = await fetch('/api/webapp/auth/telegram/check?token=' + data.token + '&_t=' + Date.now(), { credentials: 'include', cache: 'no-store' });
+            const r = await c.json();
+            if (r.authenticated) { clearInterval(_tgPollInterval); showBanner('success', '¡Bienvenido! Redirigiendo...'); setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800); }
+          } catch {}
+        }, 2000);
+      } catch { showBanner('error', 'Error de red.'); btn.disabled = false; btn.innerHTML = svgTelegram + ' Continuar con Telegram'; }
+    }
+
+    // ── X (Twitter) OAuth ─────────────────────────────────────────────────────
+    function handleXLogin() {
+      clearBanners();
+      // Direct navigation — ensures same session cookie is used for start and callback
+      window.location.href = '/api/webapp/auth/x/start?redirect=true';
+    }
+  </script>
+
 </body>
 </html>
