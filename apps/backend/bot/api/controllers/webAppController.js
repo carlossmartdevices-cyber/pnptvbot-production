@@ -612,7 +612,7 @@ const emailRegister = async (req, res) => {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     await query(
       'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [user.id, token, expiresAt]
+      [user.id, token, expiresAt.toISOString()]
     );
 
     // Send verification email
@@ -839,7 +839,7 @@ const resendVerification = async (req, res) => {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     await query(
       'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [user.id, token, expiresAt]
+      [user.id, token, expiresAt.toISOString()]
     );
 
     // Send verification email
