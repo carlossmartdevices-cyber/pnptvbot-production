@@ -1989,10 +1989,6 @@ app.get('/app/*', (req, res) => {
   res.sendFile(path.join(appPath, 'index.html'));
 });
 
-// Legacy /prime-hub → redirect to /app
-app.get(['/prime-hub', '/prime-hub/'], (req, res) => {
-  return res.redirect(301, '/app');
-});
 
 // ==========================================
 // NEW MONETIZATION & AUTH ROUTES
@@ -2045,10 +2041,6 @@ app.get('/api/webapp/auth/verify', authenticateUser, (req, res) => {
   res.status(200).send();
 });
 
-// Legacy /prime-hub/* → redirect to /app
-app.get('/prime-hub/*', (req, res) => {
-  return res.redirect(301, '/app');
-});
 
 // Sentry error handler - must be last
 if (process.env.SENTRY_DSN) {
