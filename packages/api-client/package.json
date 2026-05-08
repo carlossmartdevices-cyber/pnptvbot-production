@@ -10,6 +10,6 @@
   },
   "keywords": ["api", "axios", "client"],
   "dependencies": {
-    "axios": "^1.13.2"
+    "axios": "^1.16.0"
   }
 }
