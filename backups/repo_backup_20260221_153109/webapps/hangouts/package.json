@@ -11,7 +11,7 @@
   "dependencies": {
     "@vitejs/plugin-react": "^4.7.0",
     "agora-rtc-sdk-ng": "^4.22.1",
-    "axios": "^1.13.5",
+    "axios": "^1.16.0",
     "express": "^5.2.1",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
